@@ -5,6 +5,16 @@
 #include <sys/wait.h>
 #include <time.h>
 
+#if defined(_WIN32)
+#include <windows.h>
+#elif defined(__APPLE__)
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#include <time.h>
+#else
+#include <sys/sysinfo.h>
+#endif
+
 #define MAX_ARGS 64
 
 void print_help() {
@@ -33,6 +43,30 @@ void print_sysinfo() {
     gethostname(hostname, sizeof(hostname));
     printf("User: %s\n", user ? user : "Unknown");
     printf("Hostname: %s\n", hostname);
+
+#if defined(_WIN32)
+    ULONGLONG uptime_ms = GetTickCount64();
+    printf("Uptime: %llu seconds\n", uptime_ms / 1000);
+#elif defined(__APPLE__)
+    struct timeval boottime;
+    size_t size = sizeof(boottime);
+    int mib[2] = { CTL_KERN, KERN_BOOTTIME };
+    time_t now;
+    time(&now);
+    if (sysctl(mib, 2, &boottime, &size, NULL, 0) == 0) {
+        time_t uptime = now - boottime.tv_sec;
+        printf("Uptime: %ld seconds\n", uptime);
+    } else {
+        perror("sysctl failed");
+    }
+#else
+    struct sysinfo info;
+    if (sysinfo(&info) == 0) {
+        printf("Uptime: %ld seconds\n", info.uptime);
+    } else {
+        perror("sysinfo failed");
+    }
+#endif
 }
 
 int main() {
